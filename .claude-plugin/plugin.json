@@ -1,0 +1,10 @@
+{
+  "name": "sentinel",
+  "version": "1.0.0",
+  "description": "Background watchers that page you when something needs you (calendar conflicts across accounts, urgent mail triaged by Claude, GitHub mentions, Slack DMs, or any source you scaffold), one combined morning brief, and a reply-to-act agent: message it back and Claude does the work with your tools.",
+  "author": { "name": "NOV LLC", "url": "https://github.com/softwaresoftware-dev" },
+  "homepage": "https://sentinel.softwaresoftware.dev",
+  "repository": "https://github.com/softwaresoftware-dev/sentinel",
+  "license": "MIT",
+  "keywords": ["alerts", "monitoring", "morning-brief", "sms", "ntfy", "calendar", "email", "github", "slack", "agent", "daemon", "watcher"]
+}

@@ -1,0 +1,39 @@
+"""{{name}} — the ONE file you write: fetch items from your source and decide which ones matter.
+
+Contract:
+  fetch(cfg) -> list[dict]      each item MUST have a stable "key" (str) and "title"; add anything else you like
+                                (e.g. "when", "who", "url", "detail"). Return the current window of items, not just new ones —
+                                the engine diffs against state and only alerts on items it hasn't seen.
+  alert(item, cfg) -> str|None  return a one-line SMS reason to page the owner NOW, or None for "just record it".
+  brief(items, cfg) -> str      the daily section for this watcher (plain text, few lines). `items` = everything currently
+                                in the window (already fetched this cycle) — summarize what's coming/open.
+Optional:
+  changed(old, new) -> bool     re-alert when a known item changes materially (default: never re-alert).
+"""
+from __future__ import annotations
+from datetime import datetime, timezone
+
+
+def fetch(cfg: dict) -> list[dict]:
+    # TODO: call the API / scrape / read the file. Example shape:
+    # return [{"key": "draft:pick:12", "title": "Your pick is up", "when": "2026-08-24T19:00:00Z", "url": "..."}]
+    return []
+
+
+def alert(item: dict, cfg: dict) -> str | None:
+    # TODO: your rule. e.g. return "you're on the clock" if item.get("mine") else None
+    return None
+
+
+def brief(items: list[dict], cfg: dict) -> str:
+    if not items:
+        return "{{Title}}: nothing pending."
+    lines = [f"{{Emoji}} {{Title}} — {len(items)} item{'s' if len(items)!=1 else ''}"]
+    for it in items[:8]:
+        lines.append(f"• {it.get('title','?')[:70]}" + (f" ({it['when']})" if it.get("when") else ""))
+    if len(items) > 8: lines.append(f"…+{len(items)-8} more")
+    return "\n".join(lines)
+
+
+def changed(old: dict, new: dict) -> bool:
+    return False

@@ -1,0 +1,8 @@
+{
+  "display_information": {"name": "sentinel", "description": "Personal DM/mention watcher (read-only, user token)"},
+  "oauth_config": {
+    "redirect_urls": ["https://localhost:8765/"],
+    "scopes": {"user": ["channels:history", "channels:read", "groups:history", "groups:read", "im:history", "im:read", "mpim:history", "mpim:read", "users:read", "search:read", "team:read"]}
+  },
+  "settings": {"org_deploy_enabled": false, "socket_mode_enabled": false, "token_rotation_enabled": false}
+}

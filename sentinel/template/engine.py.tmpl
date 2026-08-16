@@ -1,0 +1,91 @@
+"""Generic sentinel engine: fetch → diff against state → alert (SMS, batched, quiet-hours) → brief. Don't edit; edit source.py."""
+from __future__ import annotations
+import json, logging, sqlite3, time
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from sentinel import notify
+from .config import DATA_DIR
+from . import source
+
+log = logging.getLogger("{{name}}.engine")
+
+
+class State:
+    def __init__(self):
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        self.db = sqlite3.connect(str(DATA_DIR / "state.db"))
+        self.db.executescript("""
+        CREATE TABLE IF NOT EXISTS seen (key TEXT PRIMARY KEY, first_ts REAL, last_ts REAL, data TEXT, alerted INTEGER, reason TEXT);
+        CREATE TABLE IF NOT EXISTS briefs (day TEXT PRIMARY KEY, sent_at REAL, text TEXT);
+        CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+        CREATE TABLE IF NOT EXISTS log (ts REAL, kind TEXT, msg TEXT);""")
+    def get(self, k, d=None):
+        r = self.db.execute("SELECT v FROM meta WHERE k=?", (k,)).fetchone(); return json.loads(r[0]) if r else d
+    def set(self, k, v): self.db.execute("INSERT OR REPLACE INTO meta VALUES (?,?)", (k, json.dumps(v))); self.db.commit()
+    def log(self, kind, msg): self.db.execute("INSERT INTO log VALUES (?,?,?)", (time.time(), kind, msg)); self.db.commit()
+    def known(self, key):
+        r = self.db.execute("SELECT data FROM seen WHERE key=?", (key,)).fetchone(); return json.loads(r[0]) if r else None
+    def upsert(self, item, alerted, reason):
+        now = time.time()
+        if self.known(item["key"]) is None:
+            self.db.execute("INSERT INTO seen VALUES (?,?,?,?,?,?)", (item["key"], now, now, json.dumps(item, default=str), int(alerted), reason or ""))
+        else:
+            self.db.execute("UPDATE seen SET last_ts=?, data=?, alerted=MAX(alerted,?), reason=COALESCE(NULLIF(?,''),reason) WHERE key=?", (now, json.dumps(item, default=str), int(alerted), reason or "", item["key"]))
+    def commit(self): self.db.commit()
+    def brief_sent(self, d): return self.db.execute("SELECT 1 FROM briefs WHERE day=?", (d,)).fetchone() is not None
+    def record_brief(self, d, t): self.db.execute("INSERT OR REPLACE INTO briefs VALUES (?,?,?)", (d, time.time(), t)); self.db.commit()
+
+
+def _hm(s): h, m = s.split(":"); return int(h) * 60 + int(m)
+def in_quiet(cfg, now):
+    qh = cfg.get("quiet_hours")
+    if not qh: return False
+    a, b, t = _hm(qh[0]), _hm(qh[1]), now.hour * 60 + now.minute
+    return (a <= t or t < b) if a > b else (a <= t < b)
+
+
+def poll(cfg: dict, st: State, send=True) -> dict:
+    tz = ZoneInfo(cfg["timezone"]); now = datetime.now(tz)
+    baseline = not st.get("baseline_done", False)
+    items = source.fetch(cfg)
+    alerts = []
+    for it in items:
+        if "key" not in it: continue
+        old = st.known(it["key"])
+        fresh = old is None or source.changed(old, it)
+        reason = source.alert(it, cfg) if fresh else None
+        page = bool(reason) and not baseline
+        st.upsert(it, page, reason)
+        if page: alerts.append({**it, "reason": reason})
+    st.commit()
+    if baseline: st.set("baseline_done", True)
+    held = st.get("held", [])
+    if in_quiet(cfg, now):
+        held += alerts; st.set("held", held); alerts = []
+    elif held:
+        alerts = held + alerts; st.set("held", [])
+    msg = sent = None
+    if alerts:
+        cap = int(cfg.get("max_alerts_per_poll", 4))
+        lines = [f"• {a.get('title','?')[:70]} — {a['reason']}" for a in alerts[:cap]]
+        if len(alerts) > cap: lines.append(f"…+{len(alerts)-cap} more")
+        msg = "{{Emoji}} {{Title}}\n" + "\n".join(lines); st.log("alert", msg)
+        if send:
+            ok, txt = notify.deliver(cfg, msg, title="{{Title}}"); sent = {"ok": ok, "detail": txt}
+        log.warning("ALERT:\n%s", msg)
+    st.set("last_poll", {"at": time.time(), "items": len(items), "alerts": len(alerts)})
+    return {"items": len(items), "alerts": len(alerts), "message": msg, "sent": sent, "baseline": baseline}
+
+
+def build_brief(cfg: dict, st: State | None = None) -> str:
+    try:
+        items = source.fetch(cfg)
+    except Exception as e:
+        return f"{{Title}}: unavailable ({type(e).__name__})"
+    return source.brief(items, cfg)
+
+
+def brief_text() -> str:
+    """No-arg entry point used by the combined sentinel brief."""
+    from . import config as C
+    return build_brief(C.load())

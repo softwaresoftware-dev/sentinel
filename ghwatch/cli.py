@@ -1,0 +1,45 @@
+from __future__ import annotations
+import argparse, json, logging, sys, time
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from sentinel import notify
+from . import config as C
+from .engine import poll, build_brief, State
+log = logging.getLogger("ghwatch")
+def _hm(s): h, m = s.split(":"); return int(h) * 60 + int(m)
+def brief_due(cfg, st, now):
+    if not cfg.get('daily_brief_time'): return False
+    if st.brief_sent(now.date().isoformat()): return False
+    t = now.hour * 60 + now.minute; return _hm(cfg["daily_brief_time"]) <= t < _hm(cfg["daily_brief_latest"])
+def send_brief(cfg, st, send):
+    text = build_brief(cfg, st)
+    if send:
+        ok, d = notify.deliver(cfg, text, title="GitHub brief"); st.log("brief", f"{'ok' if ok else 'FAIL'} {d}")
+        if ok: st.record_brief(datetime.now(ZoneInfo(cfg["timezone"])).date().isoformat(), text)
+    return text
+def cmd_run(a, cfg):
+    st = State(); tz = ZoneInfo(cfg["timezone"]); iv = int(cfg["poll_interval_seconds"])
+    log.info("ghwatch daemon: poll %ds, brief %s", iv, cfg["daily_brief_time"])
+    while True:
+        t0 = time.time()
+        try: r = poll(cfg, st, True); log.info("poll: %s", {k: v for k, v in r.items() if k != "message"})
+        except Exception as e: log.exception("poll crashed: %s", e)
+        try:
+            cfg = C.load()
+            if brief_due(cfg, st, datetime.now(tz)): log.info("brief:\n%s", send_brief(cfg, st, True))
+        except Exception as e: log.exception("brief crashed: %s", e)
+        time.sleep(max(15, iv - (time.time() - t0)))
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="ghwatch"); ap.add_argument("-v", action="store_true")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("run").set_defaults(f=cmd_run)
+    p = sub.add_parser("once"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(f=lambda a, c: print(json.dumps(poll(c, State(), not a.dry_run), indent=2, default=str)))
+    p = sub.add_parser("brief"); p.add_argument("--send", action="store_true"); p.set_defaults(f=lambda a, c: print(send_brief(c, State(), a.send)))
+    def status(a, c):
+        st = State(); print("last poll:", st.get("last_poll")); 
+        for ts, k, m in st.db.execute("SELECT ts,kind,msg FROM log ORDER BY ts DESC LIMIT 8"): print(f"  {datetime.fromtimestamp(ts).isoformat(timespec='seconds')} {k}: {m.splitlines()[0][:110]}")
+    sub.add_parser("status").set_defaults(f=status)
+    a = ap.parse_args(argv)
+    logging.basicConfig(level=logging.DEBUG if a.v else logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s", stream=sys.stderr)
+    a.f(a, C.load())
+if __name__ == "__main__": main()
