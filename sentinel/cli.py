@@ -16,7 +16,7 @@ def main(argv=None):
     p = sub.add_parser("test", help="send a test message through the configured delivery channel"); p.add_argument("message", nargs="?", default="sentinel test — delivery works"); p.set_defaults(f=lambda a, c: print(notify.deliver(c, a.message, title="sentinel")))
     p = sub.add_parser("setup", help="write the core config (owner + delivery + inbound)")
     p.add_argument("--name"); p.add_argument("--timezone"); p.add_argument("--context"); p.add_argument("--email", action="append"); p.add_argument("--phone")
-    p.add_argument("--delivery", choices=["ntfy", "sms-bridge", "pushover", "slack", "email", "desktop"]); p.add_argument("--inbound", choices=["ntfy", "sms-bridge", "none"])
+    p.add_argument("--delivery", choices=["ntfy", "sms-bridge", "pushover", "slack", "email", "desktop"]); p.add_argument("--inbound", action="append", choices=["ntfy", "sms-bridge", "none"], help="repeatable: several inbound channels are polled together")
     p.add_argument("--ntfy-topic"); p.add_argument("--ntfy-server"); p.add_argument("--ntfy-inbound-topic")
     p.add_argument("--sms-device"); p.add_argument("--sms-number"); p.add_argument("--pushover-user"); p.add_argument("--pushover-token")
     p.add_argument("--slack-webhook"); p.add_argument("--slack-token"); p.add_argument("--slack-channel")
@@ -30,7 +30,8 @@ def main(argv=None):
         if a.email: o["emails"] = a.email
         if a.phone: o["phone"] = a.phone
         if a.delivery: d["channel"] = a.delivery
-        if a.inbound: i["channel"] = a.inbound
+        if a.inbound:
+            i["channels"] = a.inbound; i["channel"] = a.inbound[0]
         if a.ntfy_topic or a.ntfy_server:
             n = d.setdefault("ntfy", {}); n["topic"] = a.ntfy_topic or n.get("topic"); n["server"] = a.ntfy_server or n.get("server", "https://ntfy.sh")
         if a.ntfy_inbound_topic:

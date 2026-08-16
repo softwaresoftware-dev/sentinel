@@ -50,11 +50,21 @@ def _ntfy(cfg: dict) -> list[dict]:
 
 
 def fetch(cfg: dict) -> list[dict]:
-    chan = cfg["inbound"].get("channel", "none")
-    if chan == "none": return []
-    if chan == "sms-bridge": return _sms_bridge(cfg)
-    if chan == "ntfy": return _ntfy(cfg)
-    raise RuntimeError(f"unknown inbound channel {chan}")
+    """Union of all configured inbound channels: `inbound.channels` (list) or the single `inbound.channel`."""
+    chans = cfg["inbound"].get("channels") or [cfg["inbound"].get("channel", "none")]
+    out, errs = [], []
+    for chan in chans:
+        try:
+            if chan == "none": continue
+            elif chan == "sms-bridge": out += _sms_bridge(cfg)
+            elif chan == "ntfy": out += _ntfy(cfg)
+            else: raise RuntimeError(f"unknown inbound channel {chan}")
+        except Exception as e:
+            errs.append(f"{chan}: {e}")
+    if errs and not out and len(errs) == len([c for c in chans if c != "none"]):
+        raise RuntimeError("; ".join(errs))
+    if errs: log.warning("inbound partial failure: %s", "; ".join(errs)[:200])
+    return out
 
 
 def recent_sent_hashes(hours=48) -> set[str]:

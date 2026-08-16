@@ -72,7 +72,7 @@ def maybe_brief(cfg: dict, st: State) -> None:
 def run(cfg: dict) -> None:
     st = State()
     iv = int(cfg.get("poll_seconds", 45))
-    log.info("sentinel loop: inbound=%s delivery=%s poll %ds, brief at %s", cfg["inbound"].get("channel"), cfg["delivery"].get("channel"), iv, cfg.get("brief_time"))
+    log.info("sentinel loop: inbound=%s delivery=%s poll %ds, brief at %s", (cfg["inbound"].get("channels") or cfg["inbound"].get("channel")), cfg["delivery"].get("channel"), iv, cfg.get("brief_time"))
     while True:
         t0 = time.time()
         try:

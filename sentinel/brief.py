@@ -44,6 +44,6 @@ def build(cfg: dict) -> str:
     for spec in cfg.get("extra_briefs", []):        # "pkg.module:function" added by `sentinel new`
         mod, _, fn = spec.partition(":")
         parts.append(_safe(spec, lambda mod=mod, fn=fn: getattr(importlib.import_module(mod), fn)()))
-    if cfg.get("inbound", {}).get("channel", "none") != "none":
+    if [c for c in (cfg.get("inbound", {}).get("channels") or [cfg.get("inbound", {}).get("channel", "none")]) if c != "none"]:
         parts.append("Reply here to have me act on anything.")
     return "\n\n".join(parts)
