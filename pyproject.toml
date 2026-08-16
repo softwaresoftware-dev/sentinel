@@ -1,6 +1,6 @@
 [project]
 name = "sentinel"
-version = "1.0.0"
+version = "1.1.0"
 description = "Sentinel — watchers that page you (calendar conflicts, urgent mail, GitHub, Slack, anything) + one morning brief + reply-to-act agent for Claude Code"
 requires-python = ">=3.11"
 dependencies = [

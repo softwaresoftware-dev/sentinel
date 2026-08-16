@@ -82,6 +82,25 @@ def main(argv=None):
         st = loop.State(); lp = st.get("started_at")
         print(f"  {'sentinel':12} loop started: {lp}  outbox: {notify.OUTBOX if notify.OUTBOX.exists() else 'empty'}")
     sub.add_parser("status").set_defaults(f=status)
+    p = sub.add_parser("remind", help='one-shot reminder: --at "tomorrow 11:00" | --in 45m | --before "<event title>" --offsets 60m,30m')
+    p.add_argument("message", nargs="*"); p.add_argument("--at", help="local time(s), comma-separated"); p.add_argument("--in", dest="in_"); p.add_argument("--before"); p.add_argument("--offsets", default="30m")
+    p.add_argument("--list", action="store_true"); p.add_argument("--cancel", type=int)
+    def remind(a, c):
+        from . import remind as R
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(c["owner"]["timezone"])
+        if a.cancel is not None: print("cancelled" if R.cancel(a.cancel) else "no such pending reminder"); return
+        if a.list or not a.message:
+            for r in R.pending(): print(f"#{r['id']}  {datetime.fromtimestamp(r['due'], tz).strftime('%a %b %-d %-I:%M%p').lower()}  {r['message']}")
+            if not R.pending(): print("no pending reminders")
+            return
+        try:
+            for rid, due in R.schedule(c, " ".join(a.message), at=a.at, in_=a.in_, before=a.before, offsets=a.offsets):
+                print(f"#{rid} at {due.strftime('%a %b %-d %-I:%M%p').lower()}")
+        except ValueError as e:
+            sys.exit(f"error: {e}")
+    p.set_defaults(f=remind)
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if a.v else logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s", stream=sys.stderr)
     logging.getLogger("urllib3").setLevel(logging.WARNING)

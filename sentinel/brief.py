@@ -40,6 +40,9 @@ def build(cfg: dict) -> str:
     for name, fn in (("calendar", cal), ("inbox", mail), ("github", gh), ("slack", slack)):
         r = _safe(name, fn)
         if r: parts.append(r)          # None = watcher not configured → no section
+    from . import remind
+    r = _safe("reminders", lambda: remind.brief_lines(cfg))
+    if r: parts.append(r)
     import importlib
     for spec in cfg.get("extra_briefs", []):        # "pkg.module:function" added by `sentinel new`
         mod, _, fn = spec.partition(":")

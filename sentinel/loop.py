@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib, json, logging, sqlite3, time
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from . import notify, inbound, agent, brief as briefmod
+from . import notify, inbound, agent, brief as briefmod, remind
 from .core import DATA_DIR
 
 log = logging.getLogger("sentinel.loop")
@@ -80,6 +80,10 @@ def run(cfg: dict) -> None:
             if n: log.info("flushed %d queued alerts", n)
         except Exception as e:
             log.warning("outbox flush: %s", e)
+        try:
+            remind.fire_due(cfg)
+        except Exception as e:
+            log.exception("reminders: %s", e)
         try:
             maybe_brief(cfg, st)
         except Exception as e:

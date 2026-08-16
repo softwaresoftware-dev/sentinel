@@ -55,6 +55,9 @@ def brief(items, cfg):     # a few lines for the morning text
 ```
 Baseline, dedupe, batching, quiet hours, outbox, CLI, brief and agent registration are already handled.
 
+## Reminders
+`sentinel remind "stretch" --in 45m` · `sentinel remind "call mom" --at "tomorrow 11:00"` · `sentinel remind "draft starts" --before "fantasy draft" --offsets 60m,30m` (looks the event up on your calendars). Delivered through the same channel; today's pending reminders show in the brief. Texting the agent "remind me 30 minutes before the draft" does the same thing.
+
 ## The reply-to-act agent
 
 Runs `claude -p` (default model opus, one session per day) with your MCP servers and the watcher CLIs, `--dangerously-skip-permissions` because that's what acting on your behalf needs. Guardrail baked into the system prompt: reads and self-only actions are free; **anything that reaches another person is drafted and needs your explicit "yes"** (or "just do it" in your original message). Test from a terminal: `sentinel ask "…"`.
