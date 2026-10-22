@@ -68,4 +68,4 @@ Runs `claude -p` (default model opus, one session per day) with your MCP servers
 ## Requirements
 Python ≥ 3.11 with `uv`; `claude` CLI; optional `gh`. Cross-platform (daemons via daemon-manager: systemd / launchd / Task Scheduler).
 
-MIT · NOV LLC · https://sentinel.softwaresoftware.dev
+MIT · GRAV LLC · https://sentinel.softwaresoftware.dev
